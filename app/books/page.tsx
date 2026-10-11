@@ -127,7 +127,7 @@ export default function Books() {
 
   const [currentPage, setCurrentPage] = useState(1);
 
-  const booksPerPage = 2;
+  const booksPerPage = 3;
   const totalPages = pagination?.totalPages || 1;
 
   // ======================================================
