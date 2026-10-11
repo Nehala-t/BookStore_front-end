@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
 const publicRoutes = [
   "/",
@@ -38,7 +38,7 @@ const sharedRoutes = [
   "/editprofile",
 ];
 
-export function middleware(request) {
+export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   const token = request.cookies.get("accessToken")?.value;

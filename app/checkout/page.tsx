@@ -205,11 +205,16 @@ export default function CheckoutPage() {
         );
 
         // If backend returns newly created address
-        if (result?.data?._id) {
-          setSelectedAddressId(
-            result.data._id
-          );
-        }
+       // If the backend returns the newly created address
+const createdAddress = result?.data;
+
+if (
+  createdAddress &&
+  !Array.isArray(createdAddress) &&
+  createdAddress._id
+) {
+  setSelectedAddressId(createdAddress._id);
+}
       }
 
       await dispatch(

@@ -115,8 +115,7 @@ export default function EditBookForm({
       price:
         book.price ?? 0,
 
-      discountPrice:
-        book.discountPrice ?? null,
+      discountPrice: book.discountPrice ?? undefined,
 
       category:
         book.category || "",
@@ -166,8 +165,7 @@ export default function EditBookForm({
       price:
         book.price ?? 0,
 
-      discountPrice:
-        book.discountPrice ?? null,
+      discountPrice: book.discountPrice ?? undefined,
 
       category:
         book.category || "",
