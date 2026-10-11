@@ -1,3 +1,4 @@
+
 "use client";
 
 import {
@@ -5,6 +6,8 @@ import {
   useMemo,
   useState,
 } from "react";
+
+import type { Book } from "../../redux/slices/bookSlice";
 
 import { useDispatch, useSelector } from "react-redux";
 import Link from "next/link";
@@ -23,24 +26,6 @@ import {
 } from "../../redux/slices/bookSlice";
 
 // ======================================================
-// BOOK TYPE
-// ======================================================
-
-interface Book {
-  _id: string;
-  title: string;
-  description: string;
-  price: number;
-  discountPrice: number;
-  category: string;
-  author: string;
-  publisher: string;
-  images: string[];
-  stock: number;
-  status: "available" | "unavailable";
-}
-
-// ======================================================
 // BOOK IMAGE SLIDER
 // ======================================================
 
@@ -51,21 +36,27 @@ function BookImageSlider({
 }) {
   const [currentImage, setCurrentImage] = useState(0);
 
+  const images = book.images ?? [];
+
   useEffect(() => {
-    if (!book.images || book.images.length <= 1) {
+    setCurrentImage(0);
+  }, [book._id]);
+
+  useEffect(() => {
+    if (images.length <= 1) {
       return;
     }
 
     const interval = setInterval(() => {
       setCurrentImage((prev) =>
-        prev === book.images.length - 1 ? 0 : prev + 1
+        prev >= images.length - 1 ? 0 : prev + 1
       );
     }, 3000);
 
     return () => clearInterval(interval);
-  }, [book.images]);
+  }, [images.length, book._id]);
 
-  if (!book.images || book.images.length === 0) {
+  if (images.length === 0) {
     return (
       <div className="flex h-full items-center justify-center bg-gray-50">
         <div className="text-center">
@@ -82,19 +73,21 @@ function BookImageSlider({
   return (
     <div className="relative h-full w-full overflow-hidden">
       <img
-        src={book.images[currentImage]}
+        src={images[currentImage]}
         alt={`${book.title} - image ${currentImage + 1}`}
         className="h-full w-full object-cover object-center transition-all duration-700 group-hover:scale-105"
       />
 
-      {book.images.length > 1 && (
+      {images.length > 1 && (
         <div className="absolute bottom-3 left-1/2 flex -translate-x-1/2 gap-1.5">
-          {book.images.map((_, index) => (
+          {images.map((_, index) => (
             <button
               key={index}
               type="button"
+              aria-label={`Show image ${index + 1}`}
               onClick={(e) => {
                 e.preventDefault();
+                e.stopPropagation();
                 setCurrentImage(index);
               }}
               className={`h-2 w-2 rounded-full transition-all ${
@@ -128,32 +121,26 @@ export default function Books() {
 
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
-  const [debouncedSearch, setDebouncedSearch] =
-  useState("");
-
-useEffect(() => {
-  const timer = setTimeout(() => {
-    setDebouncedSearch(search.trim());
-  }, 400);
-
-  return () => clearTimeout(timer);
-}, [search]);
-
-  // ======================================================
-  // CART BOOKS
-  // ======================================================
+  const [debouncedSearch, setDebouncedSearch] = useState("");
 
   const [cartBooks, setCartBooks] = useState<string[]>([]);
-
-  // ======================================================
-  // PAGINATION
-  // ======================================================
 
   const [currentPage, setCurrentPage] = useState(1);
 
   const booksPerPage = 2;
-
   const totalPages = pagination?.totalPages || 1;
+
+  // ======================================================
+  // DEBOUNCED SEARCH
+  // ======================================================
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search.trim());
+    }, 400);
+
+    return () => clearTimeout(timer);
+  }, [search]);
 
   // ======================================================
   // FETCH WISHLIST
@@ -164,15 +151,50 @@ useEffect(() => {
   }, [dispatch]);
 
   // ======================================================
+  // FETCH CART
+  // ======================================================
+
+  useEffect(() => {
+    const loadCart = async () => {
+      try {
+        const { viewCart } = await import(
+          "../../redux/slices/bookSlice"
+        );
+
+        const result = await dispatch(viewCart()).unwrap();
+
+        const cartData = result?.data;
+
+        if (Array.isArray(cartData)) {
+          const ids = cartData
+            .map((item: any) => {
+              if (typeof item.bookId === "string") {
+                return item.bookId;
+              }
+
+              return item.bookId?._id;
+            })
+            .filter((id: unknown): id is string =>
+              typeof id === "string"
+            );
+
+          setCartBooks(ids);
+        }
+      } catch (error) {
+        console.error("Failed to fetch cart:", error);
+      }
+    };
+
+    loadCart();
+  }, [dispatch]);
+
+  // ======================================================
   // WISHLIST TOGGLE
   // ======================================================
 
   const toggleWishlist = async (bookId: string) => {
     try {
-      const result = await dispatch(addWishList(bookId)).unwrap();
-
-      console.log("Wishlist result:", result);
-
+      await dispatch(addWishList(bookId)).unwrap();
       await dispatch(viewWishList()).unwrap();
     } catch (error) {
       console.error("Wishlist operation failed:", error);
@@ -185,15 +207,11 @@ useEffect(() => {
 
   const handleAddToCart = async (bookId: string) => {
     try {
-      const result = await dispatch(addToCart(bookId));
+      await dispatch(addToCart(bookId)).unwrap();
 
-      if (addToCart.fulfilled.match(result)) {
-        setCartBooks((prev) =>
-          prev.includes(bookId)
-            ? prev
-            : [...prev, bookId]
-        );
-      }
+      setCartBooks((prev) =>
+        prev.includes(bookId) ? prev : [...prev, bookId]
+      );
     } catch (error) {
       console.error("Failed to add book to cart:", error);
     }
@@ -203,24 +221,21 @@ useEffect(() => {
   // FETCH BOOKS
   // ======================================================
 
-useEffect(() => {
-  dispatch(
-    fetchBooks({
-      page: currentPage,
-      limit: booksPerPage,
-      search: debouncedSearch,
-      category:
-        selectedCategory === "All"
-          ? ""
-          : selectedCategory,
-    })
-  );
-}, [
-  dispatch,
-  currentPage,
-  debouncedSearch,
-  selectedCategory,
-]);
+  useEffect(() => {
+    dispatch(
+      fetchBooks({
+        page: currentPage,
+        limit: booksPerPage,
+        search: debouncedSearch,
+        category: selectedCategory === "All" ? "" : selectedCategory,
+      })
+    );
+  }, [
+    dispatch,
+    currentPage,
+    debouncedSearch,
+    selectedCategory,
+  ]);
 
   // ======================================================
   // SEARCH CHANGE
@@ -248,22 +263,17 @@ useEffect(() => {
 
   const categories = useMemo(() => {
     const uniqueCategories = Array.from(
-      new Set(
-        books.map((book) => book.category)
-      )
+      new Set(books.map((book) => book.category))
     );
 
     return ["All", ...uniqueCategories];
   }, [books]);
-
-  
 
   // ======================================================
   // LOADING
   // ======================================================
 
   if (isLoading && books.length === 0) {
-
     return (
       <main className="min-h-screen bg-[#faf9f7]">
         <section className="bg-gradient-to-br from-gray-950 via-gray-900 to-gray-900 px-6 py-20 lg:py-24">
@@ -287,20 +297,16 @@ useEffect(() => {
 
                 <div className="space-y-4 pt-5">
                   <div className="h-3 w-20 animate-pulse rounded-full bg-gray-200" />
-
                   <div className="h-6 w-full animate-pulse rounded-xl bg-gray-200" />
-
                   <div className="h-4 w-28 animate-pulse rounded-lg bg-gray-200" />
 
                   <div className="flex items-center justify-between pt-2">
                     <div className="h-7 w-24 animate-pulse rounded-lg bg-gray-200" />
-
                     <div className="h-5 w-16 animate-pulse rounded-full bg-gray-200" />
                   </div>
 
                   <div className="flex gap-3 pt-2">
                     <div className="h-11 flex-1 animate-pulse rounded-xl bg-gray-200" />
-
                     <div className="h-11 flex-1 animate-pulse rounded-xl bg-gray-200" />
                   </div>
                 </div>
@@ -339,7 +345,11 @@ useEffect(() => {
                 fetchBooks({
                   page: currentPage,
                   limit: booksPerPage,
-                  search,
+                  search: debouncedSearch,
+                  category:
+                    selectedCategory === "All"
+                      ? ""
+                      : selectedCategory,
                 })
               )
             }
@@ -358,7 +368,6 @@ useEffect(() => {
 
   return (
     <main className="min-h-screen bg-[#faf9f7] selection:bg-orange-500 selection:text-white">
-
       {/* HERO */}
 
       <section className="relative overflow-hidden bg-gradient-to-br from-gray-950 via-gray-900 to-gray-900 text-white">
@@ -368,10 +377,8 @@ useEffect(() => {
 
         <div className="relative mx-auto max-w-7xl px-6 py-20 lg:py-28">
           <div className="max-w-3xl">
-
             <div className="mb-6 inline-flex items-center gap-2.5 rounded-full border border-orange-500/30 bg-orange-500/10 px-4 py-2 text-xs font-bold uppercase tracking-widest text-orange-400 backdrop-blur-md">
               <span className="h-2 w-2 animate-pulse rounded-full bg-orange-500" />
-
               Curated Literary Collection
             </div>
 
@@ -395,7 +402,6 @@ useEffect(() => {
 
           <div className="mt-10 max-w-2xl">
             <div className="group relative">
-
               <svg
                 className="absolute left-5 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400"
                 fill="none"
@@ -425,6 +431,7 @@ useEffect(() => {
                     setSearch("");
                     setCurrentPage(1);
                   }}
+                  aria-label="Clear search"
                   className="absolute right-4 top-1/2 -translate-y-1/2 rounded-full p-1.5 text-gray-400 hover:bg-white/10 hover:text-white"
                 >
                   ✕
@@ -439,20 +446,15 @@ useEffect(() => {
 
       <section className="sticky top-0 z-30 border-b border-gray-200/80 bg-white/80 backdrop-blur-md">
         <div className="mx-auto max-w-7xl px-6">
-
           <div className="scrollbar-none flex gap-2.5 overflow-x-auto py-4">
-
             {categories.map((category) => {
-              const isActive =
-                selectedCategory === category;
+              const isActive = selectedCategory === category;
 
               return (
                 <button
                   key={category}
                   type="button"
-                  onClick={() =>
-                    handleCategoryChange(category)
-                  }
+                  onClick={() => handleCategoryChange(category)}
                   className={`whitespace-nowrap rounded-2xl px-5 py-2.5 text-xs font-bold uppercase tracking-wider transition-all ${
                     isActive
                       ? "bg-gray-900 text-white shadow-lg"
@@ -463,7 +465,6 @@ useEffect(() => {
                 </button>
               );
             })}
-
           </div>
         </div>
       </section>
@@ -471,11 +472,9 @@ useEffect(() => {
       {/* BOOKS */}
 
       <section className="mx-auto max-w-7xl px-6 py-12 lg:py-16">
-
         {/* HEADER */}
 
         <div className="mb-10 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
-
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-orange-600">
               Catalog View
@@ -489,26 +488,20 @@ useEffect(() => {
           </div>
 
           <div className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-600">
-
             <span className="font-bold text-gray-900">
-              {pagination?.totalBooks ??
-                books.length}
+              {pagination?.totalBooks ?? books.length}
             </span>
 
-            {(pagination?.totalBooks ??
-              books.length) === 1
+            {(pagination?.totalBooks ?? books.length) === 1
               ? "book available"
               : "books available"}
-
           </div>
         </div>
 
         {/* NO RESULTS */}
 
         {books.length === 0 ? (
-
           <div className="rounded-3xl border border-dashed border-gray-300 bg-white px-6 py-24 text-center shadow-sm">
-
             <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-3xl bg-orange-50 text-4xl">
               📚
             </div>
@@ -518,13 +511,14 @@ useEffect(() => {
             </h2>
 
             <p className="mx-auto mt-2 max-w-md text-sm text-gray-500">
-              We couldn't find any books matching your criteria.
+              We couldn&apos;t find any books matching your criteria.
             </p>
 
             <button
               type="button"
               onClick={() => {
                 setSearch("");
+                setDebouncedSearch("");
                 setSelectedCategory("All");
                 setCurrentPage(1);
               }}
@@ -532,52 +526,39 @@ useEffect(() => {
             >
               Clear Filters
             </button>
-
           </div>
-
         ) : (
-
           <>
-
             {/* BOOK GRID */}
 
             <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-
               {books.map((book) => {
+                const discountPrice = book.discountPrice ?? 0;
 
                 const hasDiscount =
-                  book.discountPrice > 0 &&
-                  book.discountPrice < book.price;
+                  discountPrice > 0 &&
+                  discountPrice < book.price;
 
-                const discountPercentage =
-                  hasDiscount
-                    ? Math.round(
-                        ((book.price -
-                          book.discountPrice) /
-                          book.price) *
-                          100
-                      )
-                    : 0;
+                const discountPercentage = hasDiscount
+                  ? Math.round(
+                      ((book.price - discountPrice) /
+                        book.price) *
+                        100
+                    )
+                  : 0;
 
-                const isWishlisted =
-                  wishlist.includes(book._id);
-
-                const isInCart =
-                  cartBooks.includes(book._id);
+                const isWishlisted = wishlist.includes(book._id);
+                const isInCart = cartBooks.includes(book._id);
 
                 return (
                   <article
                     key={book._id}
                     className="group relative flex flex-col overflow-hidden rounded-3xl border border-gray-200/80 bg-white shadow-sm transition-all duration-500 hover:-translate-y-2 hover:border-orange-500/30 hover:shadow-2xl"
                   >
-
                     {/* IMAGE */}
 
                     <div className="relative h-72 w-full overflow-hidden bg-gray-100">
-
-                      <BookImageSlider
-                        book={book}
-                      />
+                      <BookImageSlider book={book} />
 
                       {/* DISCOUNT */}
 
@@ -591,9 +572,7 @@ useEffect(() => {
 
                       <button
                         type="button"
-                        onClick={() =>
-                          toggleWishlist(book._id)
-                        }
+                        onClick={() => toggleWishlist(book._id)}
                         aria-label={
                           isWishlisted
                             ? "Remove from wishlist"
@@ -608,9 +587,7 @@ useEffect(() => {
                               : "text-gray-400 hover:text-red-500"
                           }`}
                         >
-                          {isWishlisted
-                            ? "♥"
-                            : "♡"}
+                          {isWishlisted ? "♥" : "♡"}
                         </span>
                       </button>
                     </div>
@@ -618,9 +595,7 @@ useEffect(() => {
                     {/* CONTENT */}
 
                     <div className="flex flex-1 flex-col justify-between p-5">
-
                       <div>
-
                         <p className="text-[10px] font-extrabold uppercase tracking-[0.2em] text-orange-600">
                           {book.category}
                         </p>
@@ -639,21 +614,17 @@ useEffect(() => {
                         <p className="mt-1 text-xs text-gray-400">
                           {book.publisher}
                         </p>
-
                       </div>
 
                       <div className="mt-5 border-t border-gray-100 pt-4">
-
                         {/* PRICE + STOCK */}
 
                         <div className="flex items-center justify-between">
-
                           <div className="flex items-baseline gap-2">
-
                             {hasDiscount ? (
                               <>
                                 <span className="text-xl font-black text-gray-900">
-                                  ₹{book.discountPrice}
+                                  ₹{discountPrice}
                                 </span>
 
                                 <span className="text-xs font-medium text-gray-400 line-through">
@@ -665,46 +636,32 @@ useEffect(() => {
                                 ₹{book.price}
                               </span>
                             )}
-
                           </div>
 
                           {/* STOCK */}
 
                           <div>
-
                             {book.stock > 0 &&
                             book.status === "available" ? (
-
                               <div className="flex items-center gap-1.5 text-[11px] font-semibold text-emerald-600">
-
                                 <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
 
                                 {book.stock <= 5
                                   ? `Only ${book.stock} left`
                                   : "In stock"}
-
                               </div>
-
                             ) : (
-
                               <div className="flex items-center gap-1.5 text-[11px] font-semibold text-rose-500">
-
                                 <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />
-
                                 Out of stock
-
                               </div>
-
                             )}
-
                           </div>
-
                         </div>
 
                         {/* ACTIONS */}
 
                         <div className="mt-5 flex gap-2.5">
-
                           <Link
                             href={`/books/${book._id}`}
                             className="flex-1 rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-center text-xs font-bold text-gray-700 shadow-sm transition-all hover:border-gray-900 hover:bg-gray-900 hover:text-white"
@@ -715,83 +672,59 @@ useEffect(() => {
                           {/* ADD TO CART / GO TO CART */}
 
                           {isInCart ? (
-
                             <button
                               type="button"
-                              onClick={() =>
-                                router.push("/cart")
-                              }
+                              onClick={() => router.push("/cart")}
                               className="flex-1 rounded-xl bg-orange-600 px-3 py-2.5 text-xs font-bold text-white shadow-md transition-all hover:bg-orange-700"
                             >
                               Go to Cart
                             </button>
-
                           ) : (
-
                             <button
                               type="button"
                               disabled={
                                 book.stock <= 0 ||
                                 book.status !== "available"
                               }
-                              onClick={() =>
-                                handleAddToCart(
-                                  book._id
-                                )
-                              }
+                              onClick={() => handleAddToCart(book._id)}
                               className="flex-1 rounded-xl bg-gray-900 px-3 py-2.5 text-xs font-bold text-white shadow-md transition-all hover:bg-orange-600 disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400"
                             >
                               Add to Cart
                             </button>
-
                           )}
-
                         </div>
-
                       </div>
                     </div>
-
                   </article>
                 );
               })}
-
             </div>
 
             {/* PAGINATION */}
 
             {totalPages > 1 && (
-
               <div className="mt-12 flex flex-wrap items-center justify-center gap-2">
-
-                {/* PREVIOUS */}
-
                 <button
                   type="button"
                   disabled={currentPage === 1}
                   onClick={() =>
-                    setCurrentPage(
-                      (prev) => prev - 1
-                    )
+                    setCurrentPage((prev) => prev - 1)
                   }
                   className="rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 transition hover:border-gray-900 hover:bg-gray-900 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   Previous
                 </button>
 
-                {/* PAGE NUMBERS */}
-
                 {Array.from(
-                  {
-                    length: totalPages,
-                  },
+                  { length: totalPages },
                   (_, index) => index + 1
                 ).map((page) => (
-
                   <button
                     key={page}
                     type="button"
-                    onClick={() =>
-                      setCurrentPage(page)
+                    onClick={() => setCurrentPage(page)}
+                    aria-current={
+                      currentPage === page ? "page" : undefined
                     }
                     className={`h-10 min-w-10 rounded-xl px-3 text-sm font-bold transition ${
                       currentPage === page
@@ -801,34 +734,22 @@ useEffect(() => {
                   >
                     {page}
                   </button>
-
                 ))}
-
-                {/* NEXT */}
 
                 <button
                   type="button"
-                  disabled={
-                    currentPage === totalPages
-                  }
+                  disabled={currentPage === totalPages}
                   onClick={() =>
-                    setCurrentPage(
-                      (prev) => prev + 1
-                    )
+                    setCurrentPage((prev) => prev + 1)
                   }
                   className="rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 transition hover:border-gray-900 hover:bg-gray-900 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   Next
                 </button>
-
               </div>
-
             )}
-
           </>
-
         )}
-
       </section>
     </main>
   );

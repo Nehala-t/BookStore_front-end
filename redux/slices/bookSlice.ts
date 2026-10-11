@@ -108,6 +108,13 @@ export interface CartResponse {
   data: any;
 }
 
+
+export interface ShippingAddressListResponse {
+  success: boolean;
+  message: string;
+  data: ShippingAddress[];
+}
+
 // ======================================================
 // SHIPPING ADDRESS TYPE
 // ======================================================
@@ -846,36 +853,29 @@ export const addShippingAddress =
 // VIEW ALL SHIPPING ADDRESSES
 // ======================================================
 
-export const viewShippingAddresses =
-  createAsyncThunk<
-    ShippingAddressResponse,
-    void,
-    { rejectValue: string }
-  >(
-    "books/viewShippingAddresses",
+export const viewShippingAddresses = createAsyncThunk<
+  ShippingAddressListResponse,
+  void,
+  { rejectValue: string }
+>(
+  "books/viewShippingAddresses",
+  async (_, { rejectWithValue }) => {
+    try {
+      const response = await api.get(
+        "/shippingAddress/viewAddresses"
+      );
 
-    async (
-      _,
-      { rejectWithValue }
-    ) => {
-      try {
-        const response =
-          await api.get(
-            "/shippingAddress/viewAddresses"
-          );
+      return response.data as ShippingAddressListResponse;
+    } catch (error: any) {
+      const message =
+        error.response?.data?.message ||
+        "Failed to fetch shipping addresses";
 
-        return response.data as ShippingAddressResponse;
-      } catch (error: any) {
-        const message =
-          error.response?.data?.message ||
-          "Failed to fetch shipping addresses";
-
-        toast.error(message);
-
-        return rejectWithValue(message);
-      }
+      toast.error(message);
+      return rejectWithValue(message);
     }
-  );
+  }
+);
 
 // ======================================================
 // VIEW SINGLE SHIPPING ADDRESS
@@ -1361,10 +1361,7 @@ const bookSlice = createSlice({
       .addCase(
         addWishList.fulfilled,
 
-        (
-          state,
-          action: PayloadAction<WishlistResponse>
-        ) => {
+        (state, action) => {
           state.wishlistLoading =
             false;
 
@@ -1543,10 +1540,7 @@ const bookSlice = createSlice({
       .addCase(
         removeWishList.fulfilled,
 
-        (
-          state,
-          action: PayloadAction<WishlistResponse>
-        ) => {
+        (state, action) => {
           state.wishlistLoading =
             false;
 
@@ -1986,47 +1980,27 @@ const bookSlice = createSlice({
         }
       )
 
-      .addCase(
-        viewShippingAddresses.fulfilled,
+     .addCase(
+  viewShippingAddresses.fulfilled,
+  (
+    state,
+    action: PayloadAction<ShippingAddressListResponse>
+  ) => {
+    state.shippingAddressLoading = false;
+    state.shippingAddressError = null;
 
-        (
-          state,
-          action: PayloadAction<ShippingAddressResponse>
-        ) => {
-          state.shippingAddressLoading =
-            false;
+    const addresses = action.payload.data;
 
-          state.shippingAddressError =
-            null;
+    state.shippingAddresses = addresses;
 
-          const addresses =
-            action.payload.data;
+    const defaultAddress = addresses.find(
+      (address) => address.isDefault
+    );
 
-          if (
-            Array.isArray(addresses)
-          ) {
-            state.shippingAddresses =
-              addresses;
-
-            const defaultAddress =
-              addresses.find(
-                (address) =>
-                  address.isDefault
-              );
-
-            state.selectedShippingAddress =
-              defaultAddress ||
-              addresses[0] ||
-              null;
-          } else {
-            state.shippingAddresses =
-              [];
-
-            state.selectedShippingAddress =
-              null;
-          }
-        }
-      )
+    state.selectedShippingAddress =
+      defaultAddress || addresses[0] || null;
+  }
+)
 
       .addCase(
         viewShippingAddresses.rejected,

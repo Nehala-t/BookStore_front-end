@@ -186,11 +186,11 @@ export default function CheckoutPage() {
     try {
       if (editingAddressId) {
         await dispatch(
-          updateShippingAddress({
-            addressId: editingAddressId,
-            address,
-          })
-        ).unwrap();
+  updateShippingAddress({
+    addressId: editingAddressId,
+    data: address,
+  })
+).unwrap();
 
         toast.success(
           "Address updated successfully"
