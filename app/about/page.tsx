@@ -23,16 +23,20 @@ export default function AboutPage() {
           <span className="font-bold text-lg tracking-tight">SaaSBookstore</span>
         </Link>
         <div className="flex items-center gap-4">
-          <Link href="/books" className="text-sm font-medium text-slate-600 hover:text-indigo-600 transition-colors">
-            Browse Catalog
-          </Link>
-          <Link 
-            href="/books" 
-            className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-4 py-2 rounded-xl transition-colors shadow-sm"
-          >
-            Explore Books
-          </Link>
-        </div>
+  <Link
+    href="/books"
+    className="hidden sm:block text-sm font-medium text-slate-600 hover:text-indigo-600 transition-colors"
+  >
+    Browse Catalog
+  </Link>
+
+  <Link
+    href="/books"
+    className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-4 py-2 rounded-xl transition-colors shadow-sm"
+  >
+    Explore Books
+  </Link>
+</div>
       </header>
 
       {/* Main Container */}
@@ -135,9 +139,9 @@ export default function AboutPage() {
           </div>
           <Link 
             href="/books"
-            className="inline-flex items-center gap-2 bg-white text-indigo-600 font-semibold px-6 py-3.5 rounded-2xl hover:bg-slate-100 transition-colors shadow-sm"
+            className="inline-flex  items-center gap-2 bg-white text-indigo-600 font-semibold px-6 py-3.5 rounded-2xl hover:bg-slate-100 transition-colors shadow-sm"
           >
-            Explore Catalog <ArrowRight className="w-4 h-4" />
+            Explore Catalog <ArrowRight className="w-4 h-4 " />
           </Link>
         </div>
 

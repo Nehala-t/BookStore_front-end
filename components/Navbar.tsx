@@ -224,6 +224,15 @@ export default function Navbar() {
                         >
                             About
                         </Link>
+
+                        {/* CONTACT US */}
+
+                        <Link
+                            href="/contactus"
+                            className="text-sm font-medium text-gray-700 transition hover:text-orange-600"
+                        >
+                            Contact Us
+                        </Link>
                     </div>
 
                     {/* ====================================
@@ -397,6 +406,15 @@ export default function Navbar() {
                                 className="rounded-lg px-4 py-3 text-sm font-medium text-gray-700 transition hover:bg-orange-50 hover:text-orange-600"
                             >
                                 About
+                            </Link>
+
+
+                            <Link
+                                href="/contactus"
+                                onClick={closeMobileMenu}
+                                className="rounded-lg px-4 py-3 text-sm font-medium text-gray-700 transition hover:bg-orange-50 hover:text-orange-600"
+                            >
+                                Contact Us
                             </Link>
 
                             {/* ==================================

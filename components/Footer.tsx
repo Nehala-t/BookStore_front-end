@@ -94,7 +94,7 @@ export default function Footer() {
               </Link>
 
               <Link
-                href="/contact"
+                href="/contactus"
                 className="block text-sm text-gray-400 transition hover:text-orange-500"
               >
                 Contact Us

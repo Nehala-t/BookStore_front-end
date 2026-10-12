@@ -45,7 +45,7 @@ export function middleware(request: NextRequest) {
   const role = request.cookies.get("role")?.value;
 console.log("MIDDLEWARE:", {
     pathname,
-    hasToken: !!token,
+    token,
     role,
   });
   // =====================================
